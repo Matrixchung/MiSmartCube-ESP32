@@ -42,7 +42,7 @@
  * data[31] = 0
  * 
  * Face index: 1 - Blue, 2 - Yellow, 3 - Orange, 4 - White, 5 - Red, 6 - Green
- * Direction index: 1 - Clockwise, 3 - Counter-clockwise
+ * Direction index: 3 - Clockwise, 1 - Counter-clockwise
  * data[32] means the face index shifted this time.
  * data[33] means the direction index of the face shifted this time.
  * 

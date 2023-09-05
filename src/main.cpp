@@ -20,6 +20,7 @@
 #define SHOW_SCAN_RESULT 0 // For showing bluetooth scan results without connecting to the cube.
 #define REGISTER_BATTERY_CALLBACK 0 // For seeing the battery level of cube
 #define MAX_CONNECT_RETRIES 10
+#define DEBUG_SERIAL_OUTPUT false
 
 const String CUBE_MAC = "C2:B5:A6:8D:1E:73"; // Please change this to your own cube's MAC address
 static BLEUUID CUBE_DATA_SERVICE_UUID("0000aadb-0000-1000-8000-00805f9b34fb");
@@ -123,11 +124,13 @@ bool registerBatteryCallback(BLEClient *client){
 }
 #endif
 static void onDataNotifyCallback(BLERemoteCharacteristic* pCharacter, uint8_t* pData, size_t length, bool isNotify){
+  #if DEBUG_SERIAL_OUTPUT
   if(length != 20){
     Serial.print("Received data with invalid length: ");
     Serial.println(length);
     return;
   }
+  #endif
   bool isEncrypted = pData[18] == 0xA7; // if pData[18] is 0xA7(167), then the color data is encrypted by AES.
   if(isEncrypted){
     uint8_t offset1 = getHalfByte(pData, 38);
@@ -137,6 +140,7 @@ static void onDataNotifyCallback(BLERemoteCharacteristic* pCharacter, uint8_t* p
   uint8_t colorData[36] = {0};
   for(int i = 0; i < 36; i++) colorData[i] = getHalfByte(pData, i);
   CubeModel newCube = CubeModel(colorData);
+  #if DEBUG_SERIAL_OUTPUT
   if(newCube.isSolved()) Serial.println("Cube is solved.");
   printCube(newCube);
   for(int i = 0; i < 36; i++){
@@ -146,12 +150,18 @@ static void onDataNotifyCallback(BLERemoteCharacteristic* pCharacter, uint8_t* p
   }
   Serial.println();
   Serial.println("--------------------");
-
+  #else
+  Serial.print((uint8_t)newCube.turnedFace);
+  Serial.print(' ');
+  Serial.println(newCube.turnedDir);
+  #endif
 }
 bool connectToServer(BLEAdvertisedDevice device){
   bool connected = false;
+  #if DEBUG_SERIAL_OUTPUT
   Serial.print("Connecting ");
   Serial.println(device.getAddress().toString().c_str());
+  #endif
   // Step #1: Create BLE Client
   BLEClient *pClient = BLEDevice::createClient();
   // Step #2: Assign BLEClientCallbacks
@@ -160,32 +170,42 @@ bool connectToServer(BLEAdvertisedDevice device){
   for (int i = 1; i <= MAX_CONNECT_RETRIES; i++){
     if(connected = pClient->connect(&device)) break;
   }
+  #if DEBUG_SERIAL_OUTPUT
   if(!connected){
     Serial.println("Failed to connect to cube.");
     return false;
   }
+  #endif
   // Step #4: Find specified service
   BLERemoteService *pRemoteService = pClient->getService(CUBE_DATA_SERVICE_UUID);
   connected = pRemoteService != nullptr;
+  #if DEBUG_SERIAL_OUTPUT
   if(!connected){
     Serial.println("Failed to find specified service.");
     return false;
   }
+  #endif
   // Step #5: Find specified characteristic in the given service in step #4
   pColorCharacter = pRemoteService->getCharacteristic(CUBE_DATA_CHAR_UUID);
   connected = pColorCharacter != nullptr;
+  #if DEBUG_SERIAL_OUTPUT
   if(!connected){
     Serial.println("Failed to find specified characteristic.");
     return false;
   }
+  #endif
   // Step #6: Register callback function for the characteristic
   connected = pColorCharacter->canNotify();
+  #if DEBUG_SERIAL_OUTPUT
   if(!connected){
     Serial.println("Failed to register callback - character cannot notify.");
     return false;
   }
+  #endif
   pColorCharacter->registerForNotify(onDataNotifyCallback);
+  #if DEBUG_SERIAL_OUTPUT
   Serial.println("Successfully registered data callback.");
+  #endif
   // Step #7: Register callback function for battery service
   #if REGISTER_BATTERY_CALLBACK
   if(registerBatteryCallback(pClient)) Serial.println("Successfully registered battery callback.");
